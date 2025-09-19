@@ -38,6 +38,12 @@ def git_root() -> Path:
 def branch() -> str:
     return d(run(["git","rev-parse","--abbrev-ref","HEAD"]).stdout).strip()
 
+
+def sanitize_for_path(value: str) -> str:
+    sanitized = re.sub(r"[^A-Za-z0-9/._-]", "_", value)
+    sanitized = sanitized.strip("/") or "branch"
+    return sanitized
+
 def short_sha() -> str:
     cp = run(["git","rev-parse","--short","HEAD"], check=False)
     out = d(cp.stdout).strip()
@@ -121,6 +127,7 @@ def main():
         base_branch = sys.argv[1]
 
     br = branch(); sha = short_sha(); ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    safe_branch = sanitize_for_path(br)
     diff_file = in_dir/"diff.patch"
     changed, diff_bytes = build_diff(diff_file, base_branch)
     diff_text = diff_file.read_text(encoding="utf-8")
@@ -149,8 +156,8 @@ def main():
     cp = run(cmd, input_text=prompt, check=False, env=exec_env)
     stdout = d(cp.stdout); (in_dir/"raw.txt").write_text(stdout, encoding="utf-8")
 
-    report_md   = out_dir/f"{br}_{sha}_{ts}.md"
-    report_json = out_dir/f"{br}_{sha}_{ts}.json"
+    report_md   = out_dir/f"{safe_branch}_{sha}_{ts}.md"
+    report_json = out_dir/f"{safe_branch}_{sha}_{ts}.json"
     report_md.parent.mkdir(parents=True, exist_ok=True)
 
     js = extract_between(stdout, REVIEW_JSON_START, REVIEW_JSON_END)
