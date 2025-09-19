@@ -1,0 +1,20 @@
+[codex]
+model = "gpt-5-codex"
+reasoning = "high"
+approval_mode = "read-only"
+max_output_tokens = 24000
+
+[gating]
+# Fail if any finding priority <= this number (0=P0, 1=P1, 2=P2, 3=P3).
+fail_on_priority_max = 1
+# Fallback when priority is missing; grep for these tokens in Markdown.
+fail_on_severity = ["HIGH"]
+
+[review]
+base_branch = "origin/main"
+include_categories = ["correctness","security","performance","testing","style","duplication","observability","deps","compat"]
+
+[paths]
+context_dir = "var/_codex_input"
+output_dir  = "var/reviews"
+library_dir = ".codex-review"
