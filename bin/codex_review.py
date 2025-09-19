@@ -11,10 +11,14 @@ except Exception:
 REVIEW_JSON_START, REVIEW_JSON_END = "REVIEW_START_JSON","REVIEW_END_JSON"
 REVIEW_MD_START,   REVIEW_MD_END   = "REVIEW_START_MD","REVIEW_END_MD"
 
-def run(cmd, input_text=None, check=True):
+def run(cmd, input_text=None, check=True, env=None):
     return subprocess.run(
-        cmd, input=(input_text.encode() if input_text else None),
-        capture_output=True, text=False, check=check
+        cmd,
+        input=(input_text.encode() if input_text else None),
+        capture_output=True,
+        text=False,
+        check=check,
+        env=env
     )
 
 
@@ -33,6 +37,12 @@ def git_root() -> Path:
 
 def branch() -> str:
     return d(run(["git","rev-parse","--abbrev-ref","HEAD"]).stdout).strip()
+
+
+def sanitize_for_path(value: str) -> str:
+    sanitized = re.sub(r"[^A-Za-z0-9/._-]", "_", value)
+    sanitized = sanitized.strip("/") or "branch"
+    return sanitized
 
 def short_sha() -> str:
     cp = run(["git","rev-parse","--short","HEAD"], check=False)
@@ -117,6 +127,7 @@ def main():
         base_branch = sys.argv[1]
 
     br = branch(); sha = short_sha(); ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    safe_branch = sanitize_for_path(br)
     diff_file = in_dir/"diff.patch"
     changed, diff_bytes = build_diff(diff_file, base_branch)
     diff_text = diff_file.read_text(encoding="utf-8")
@@ -133,18 +144,21 @@ def main():
     (in_dir/"prompt.txt").write_text(prompt, encoding="utf-8")
 
     # Build codex exec command
-    help_txt = d(run(["codex","--help"], check=False).stdout or b"")
+    exec_env = {**os.environ, "CODEX_HOME": str(lib_dir)}
+
+    help_txt = d(run(["codex","--help"], check=False, env=exec_env).stdout or b"")
     cmd = ["codex","exec"]
     if "--model" in help_txt and codex_cfg.get("model"): cmd += ["--model", str(codex_cfg["model"])]
     if "--reasoning" in help_txt and codex_cfg.get("reasoning"): cmd += ["--reasoning", str(codex_cfg["reasoning"])]
     if "--approval-mode" in help_txt and codex_cfg.get("approval_mode"): cmd += ["--approval-mode", str(codex_cfg["approval_mode"])]
     if "--max-output-tokens" in help_txt and codex_cfg.get("max_output_tokens"): cmd += ["--max-output-tokens", str(codex_cfg["max_output_tokens"])]
 
-    cp = run(cmd, input_text=prompt, check=False)
+    cp = run(cmd, input_text=prompt, check=False, env=exec_env)
     stdout = d(cp.stdout); (in_dir/"raw.txt").write_text(stdout, encoding="utf-8")
 
-    report_md   = out_dir/f"{br}_{sha}_{ts}.md"
-    report_json = out_dir/f"{br}_{sha}_{ts}.json"
+    report_md   = out_dir/f"{safe_branch}_{sha}_{ts}.md"
+    report_json = out_dir/f"{safe_branch}_{sha}_{ts}.json"
+    report_md.parent.mkdir(parents=True, exist_ok=True)
 
     js = extract_between(stdout, REVIEW_JSON_START, REVIEW_JSON_END)
     md = extract_between(stdout, REVIEW_MD_START, REVIEW_MD_END)
