@@ -2,7 +2,7 @@
 from __future__ import annotations
 import os, sys, json, subprocess, re
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 try:
     import tomllib
 except Exception:
@@ -116,7 +116,7 @@ def main():
     if len(sys.argv)>1 and not sys.argv[1].startswith("-"):
         base_branch = sys.argv[1]
 
-    br = branch(); sha = short_sha(); ts = datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%SZ")
+    br = branch(); sha = short_sha(); ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     diff_file = in_dir/"diff.patch"
     changed, diff_bytes = build_diff(diff_file, base_branch)
     diff_text = diff_file.read_text(encoding="utf-8")
